@@ -1,9 +1,9 @@
 'use client'
 
-import { Editor as MonacoEditor } from '@monaco-editor/react'
-import { CommentLayer } from './comment-layer'
-import { useState } from 'react'
-import type { Comment } from '@/lib/types'
+import { useState } from "react"
+import MonacoEditor from "@monaco-editor/react"
+import { CommentLayer } from "./comment-layer"
+import { Comment } from "@/lib/types"
 
 interface EditorProps {
   value: string
@@ -16,27 +16,29 @@ interface EditorProps {
 export function Editor({ 
   value, 
   onChange, 
-  placeholder,
-  isCommentingEnabled = false,
-  onCommentComplete = () => {}
+  placeholder, 
+  isCommentingEnabled = false, 
+  onCommentComplete = () => {} 
 }: EditorProps) {
   const [comments, setComments] = useState<Comment[]>([])
-  const [editorInstance, setEditorInstance] = useState<any>(null)
 
   const handleAddComment = (x: number, y: number, content: string) => {
     const newComment: Comment = {
-      id: Math.random().toString(36).substring(2),
-      x,
-      y,
+      id: Math.random().toString(),
       content,
-      author: 'You',
+      author: "User",
       createdAt: new Date(),
+      type: "suggestion",
+      reactions: [],
+      status: "open",
+      x,
+      y
     }
-    setComments([...comments, newComment])
+    setComments(prev => [...prev, newComment])
   }
 
   const handleDeleteComment = (id: string) => {
-    setComments(comments.filter((comment) => comment.id !== id))
+    setComments(prev => prev.filter(comment => comment.id !== id))
   }
 
   return (
@@ -46,14 +48,13 @@ export function Editor({
         defaultLanguage="javascript"
         value={value}
         onChange={onChange}
-        onMount={(editor) => setEditorInstance(editor)}
         theme="vs-light"
         options={{
           minimap: { enabled: false },
           fontSize: 14,
-          lineNumbers: 'on',
+          lineNumbers: "on",
           scrollBeyondLastLine: false,
-          wordWrap: 'on',
+          wordWrap: "on",
           padding: { top: 16, bottom: 16 },
           readOnly: isCommentingEnabled
         }}
@@ -66,7 +67,6 @@ export function Editor({
         onCommentComplete={onCommentComplete}
         lineHeight={20}
         charWidth={8}
-        editor={editorInstance}
       />
     </div>
   )

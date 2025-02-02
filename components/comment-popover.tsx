@@ -5,14 +5,16 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { X } from "lucide-react"
+import { CodeComment } from "@/lib/types"
 
 interface CommentPopoverProps {
   position: { x: number; y: number }
   onClose: () => void
-  onSubmit: (comment: string) => void
+  onSubmit: (content: string) => void
+  existingComment?: CodeComment
 }
 
-export function CommentPopover({ position, onClose, onSubmit }: CommentPopoverProps) {
+export function CommentPopover({ position, onClose, onSubmit, existingComment }: CommentPopoverProps) {
   const [comment, setComment] = React.useState("")
 
   const handleSubmit = (e: React.FormEvent) => {

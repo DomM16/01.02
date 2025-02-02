@@ -1,13 +1,15 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { Comment } from '@/lib/types'
+import { motion, AnimatePresence } from 'framer-motion'
+import { CodeComment } from "@/lib/types"
 import { CommentMarker } from './comment-marker'
 import { CommentThread } from './comment-thread'
 import { PlacedComment } from './placed-comment'
+import { CommentPopover } from './comment-popover'
 
 interface CommentLayerProps {
-  comments: Comment[]
+  comments: CodeComment[]
   onAddComment: (x: number, y: number, content: string) => void
   onDeleteComment: (id: string) => void
   isCommentingEnabled: boolean
@@ -27,141 +29,90 @@ export function CommentLayer({
   charWidth = 8,   // Default char width
   editor,
 }: CommentLayerProps) {
-  const [activeThread, setActiveThread] = useState<string | null>(null)
+  const [activeComment, setActiveComment] = useState<string | null>(null)
   const [newCommentPosition, setNewCommentPosition] = useState<{ x: number; y: number } | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
   const handleClick = (e: React.MouseEvent) => {
     if (!containerRef.current || !isCommentingEnabled) return
+    e.stopPropagation()
 
     const rect = containerRef.current.getBoundingClientRect()
-    const scrollTop = containerRef.current.scrollTop
-    const scrollLeft = containerRef.current.scrollLeft
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
 
-    // Calculate the line and character position
-    const x = Math.floor((e.clientX - rect.left + scrollLeft) / charWidth)
-    const y = Math.floor((e.clientY - rect.top + scrollTop) / lineHeight)
-
-    setNewCommentPosition({ x, y })
-    setActiveThread("new")
-  }
-
-  const handleThreadClick = (key: string, x: number, y: number) => {
-    setActiveThread(activeThread === key ? null : key)
     setNewCommentPosition({ x, y })
   }
 
   const handleAddComment = (content: string) => {
     if (newCommentPosition) {
       onAddComment(newCommentPosition.x, newCommentPosition.y, content)
-      if (activeThread === "new") {
-        onCommentComplete()
-        // Don't close the thread after adding the first comment
-        setActiveThread(`comment-${newCommentPosition.x}-${newCommentPosition.y}`)
-      }
+      setNewCommentPosition(null)
+      onCommentComplete()
     }
-  }
-
-  // Group comments by their position
-  const commentGroups = comments.reduce((groups, comment) => {
-    const key = `${comment.x}-${comment.y}`
-    if (!groups[key]) {
-      groups[key] = []
-    }
-    groups[key].push(comment)
-    return groups
-  }, {} as Record<string, Comment[]>)
-
-  // Helper function to determine if comment thread should appear on the left
-  const shouldShowOnLeft = (x: number) => {
-    if (!containerRef.current) return false
-    const terminalWidth = containerRef.current.clientWidth
-    return (x * charWidth) > terminalWidth - 400 // 400px is approximate thread width
   }
 
   return (
     <div
       ref={containerRef}
-      className="absolute inset-0 overflow-auto"
+      className="absolute inset-0"
       onClick={handleClick}
       style={{ 
-        pointerEvents: isCommentingEnabled ? "all" : "none",
-        cursor: isCommentingEnabled ? "crosshair" : "default"
+        pointerEvents: isCommentingEnabled ? 'all' : 'none',
+        cursor: isCommentingEnabled ? 'crosshair' : 'default'
       }}
     >
-      {Object.entries(commentGroups).map(([position, groupComments]) => {
-        const [x, y] = position.split("-").map(Number)
-        const key = `comment-${x}-${y}`
-        const isActive = activeThread === key
-        const showOnLeft = shouldShowOnLeft(x)
-
-        return (
-          <div 
-            key={key} 
-            style={{ 
-              position: "absolute", 
-              left: `${x * charWidth}px`,
-              top: `${y * lineHeight}px`,
-              pointerEvents: "all"
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {isActive ? (
-              <div style={{ 
-                position: "relative",
-                pointerEvents: "all" 
-              }}>
-                <CommentThread
-                  comments={groupComments}
-                  onAddComment={(content) => {
-                    onAddComment(x, y, content)
-                  }}
-                  onDeleteComment={onDeleteComment}
-                  position={{ x: showOnLeft ? -350 : 20, y: 0 }}
-                  onClose={() => setActiveThread(null)}
-                />
-              </div>
-            ) : (
-              <div style={{ pointerEvents: "all" }}>
-                <PlacedComment
-                  comment={groupComments[groupComments.length - 1]}
-                  onDelete={(id) => onDeleteComment(id)}
-                  onClick={() => handleThreadClick(key, x, y)}
-                  isExpanded={isActive}
-                  commentCount={groupComments.length}
-                />
-              </div>
-            )}
-          </div>
-        )
-      })}
-
-      {activeThread === "new" && newCommentPosition && (
+      {comments.map((comment) => (
         <div
-          style={{ 
-            position: "absolute", 
-            left: `${newCommentPosition.x * charWidth}px`,
-            top: `${newCommentPosition.y * lineHeight}px`,
-            pointerEvents: "all"
+          key={comment.id}
+          style={{
+            position: 'absolute',
+            left: comment.x,
+            top: comment.y,
+            pointerEvents: 'all', // Enable pointer events for comments always
           }}
-          onClick={(e) => e.stopPropagation()}
         >
-          <CommentThread
-            comments={[]}
-            onAddComment={handleAddComment}
-            onDeleteComment={onDeleteComment}
-            position={{ 
-              x: shouldShowOnLeft(newCommentPosition.x) ? -350 : 20, 
-              y: 0 
+          <CommentMarker
+            onClick={(e) => {
+              e.stopPropagation()
+              setActiveComment(activeComment === comment.id ? null : comment.id)
             }}
-            onClose={() => {
-              setActiveThread(null)
-              setNewCommentPosition(null)
-              onCommentComplete()
-            }}
+            count={1}
           />
+          <AnimatePresence>
+            {activeComment === comment.id && (
+              <CommentPopover
+                position={{ x: 20, y: 0 }}
+                onClose={() => setActiveComment(null)}
+                onSubmit={(content) => {
+                  onAddComment(comment.x, comment.y, content)
+                  setActiveComment(null)
+                }}
+                existingComment={comment}
+              />
+            )}
+          </AnimatePresence>
         </div>
-      )}
+      ))}
+
+      <AnimatePresence>
+        {newCommentPosition && (
+          <div
+            style={{
+              position: 'absolute',
+              left: newCommentPosition.x,
+              top: newCommentPosition.y,
+              pointerEvents: 'all',
+            }}
+          >
+            <CommentPopover
+              position={{ x: 20, y: 0 }}
+              onClose={() => setNewCommentPosition(null)}
+              onSubmit={handleAddComment}
+            />
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   )
 } 
